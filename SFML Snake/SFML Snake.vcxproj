@@ -103,13 +103,13 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>sfml\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>sfml\include;..\Shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>sfml\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>sfml-graphics-d.lib;sfml-window-d.lib;sfml-system-d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sfml-graphics-d.lib;sfml-window-d.lib;sfml-network-d.lib;sfml-system-d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)*.dll" "$(OutDir)"</Command>
@@ -124,13 +124,13 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>sfml\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>sfml\include;..\Shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>sfml\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>sfml-graphics.lib;sfml-window.lib;sfml-system.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sfml-graphics.lib;sfml-window.lib;sfml-network.lib;sfml-system.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)*.dll" "$(OutDir)"</Command>
@@ -141,6 +141,7 @@
     <ClCompile Include="src\game.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\menu.cpp" />
+    <ClCompile Include="src\multiplayer.cpp" />
     <ClCompile Include="src\snake.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -248,6 +249,8 @@
     <ClInclude Include="src\food.hpp" />
     <ClInclude Include="src\game.hpp" />
     <ClInclude Include="src\menu.hpp" />
+    <ClInclude Include="src\multiplayer.hpp" />
+    <ClInclude Include="..\Shared\Protocol.hpp" />
     <ClInclude Include="src\snake.hpp" />
   </ItemGroup>
   <ItemGroup>

@@ -30,6 +30,9 @@
     <ClCompile Include="src\menu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\multiplayer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="sfml\include\SFML\Audio\AudioResource.hpp">
@@ -345,6 +348,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\menu.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\multiplayer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Shared\Protocol.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

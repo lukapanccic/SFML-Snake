@@ -21,6 +21,9 @@
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Shared\Protocol.hpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -114,14 +117,20 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>..\SFML Snake\sfml\include;..\Shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>..\SFML Snake\sfml\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>sfml-network-d.lib;sfml-system-d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>xcopy /y /d "$(ProjectDir)..\SFML Snake\sfml-network-d-3.dll" "$(OutDir)" &amp;&amp; xcopy /y /d "$(ProjectDir)..\SFML Snake\sfml-system-d-3.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -132,14 +141,20 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>..\SFML Snake\sfml\include;..\Shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>..\SFML Snake\sfml\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>sfml-network.lib;sfml-system.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>xcopy /y /d "$(ProjectDir)..\SFML Snake\sfml-network-3.dll" "$(OutDir)" &amp;&amp; xcopy /y /d "$(ProjectDir)..\SFML Snake\sfml-system-3.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
