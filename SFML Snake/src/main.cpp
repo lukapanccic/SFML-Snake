@@ -11,7 +11,10 @@ enum class AppState
 {
 	MainMenu,
 	UsernameEntry,
-	Multiplayer,
+	Lobby,
+	InviteSent,
+	InviteReceived,
+	Room,
 	Playing,
 	Paused,
 	GameOver
@@ -38,6 +41,13 @@ int main()
 	MultiplayerClient mpClient;
 	bool showConnectError = false;
 	sf::Clock messageClock;
+
+	int selectedPlayerIndex = 0;
+	std::string seedInput;
+
+	std::string toastMessage;
+	sf::Clock toastClock;
+	bool showToast = false;
 
 	// seed
 	std::mt19937 random(std::random_device{}());
@@ -94,7 +104,10 @@ int main()
 						if (!usernameInput.empty())
 						{
 							if (mpClient.connect(Protocol::ServerAddress, Protocol::PORT, usernameInput))
-								state = AppState::Multiplayer;
+							{
+								selectedPlayerIndex = 0;
+								state = AppState::Lobby;
+							}
 							else
 							{
 								showConnectError = true;
@@ -103,12 +116,68 @@ int main()
 						}
 					}
 				}
-				else if (state == AppState::Multiplayer)
+				else if (state == AppState::Lobby)
 				{
-					if (key == sf::Keyboard::Key::Escape)
+					const std::vector<std::string>& players = mpClient.getPlayers();
+					if (key == sf::Keyboard::Key::Up || key == sf::Keyboard::Key::W)
+					{
+						if (!players.empty())
+							selectedPlayerIndex = (selectedPlayerIndex - 1 + (int)players.size()) % (int)players.size();
+					}
+					else if (key == sf::Keyboard::Key::Down || key == sf::Keyboard::Key::S)
+					{
+						if (!players.empty())
+							selectedPlayerIndex = (selectedPlayerIndex + 1) % (int)players.size();
+					}
+					else if (key == sf::Keyboard::Key::Enter)
+					{
+						if (selectedPlayerIndex >= 0 && selectedPlayerIndex < (int)players.size())
+							mpClient.invitePlayer(players[selectedPlayerIndex]);
+					}
+					else if (key == sf::Keyboard::Key::Escape)
 					{
 						mpClient.disconnect();
 						state = AppState::MainMenu;
+					}
+				}
+				else if (state == AppState::InviteSent)
+				{
+					if (key == sf::Keyboard::Key::Escape)
+						mpClient.cancelInvite();
+				}
+				else if (state == AppState::InviteReceived)
+				{
+					if (key == sf::Keyboard::Key::Enter)
+						mpClient.acceptInvite();
+					else if (key == sf::Keyboard::Key::Escape)
+						mpClient.declineInvite();
+				}
+				else if (state == AppState::Room)
+				{
+					if (key == sf::Keyboard::Key::Escape)
+						mpClient.leaveRoom();
+					else if (mpClient.isRoomMaster())
+					{
+						if (key == sf::Keyboard::Key::Backspace)
+						{
+							if (!seedInput.empty())
+								seedInput.pop_back();
+						}
+						else if (key == sf::Keyboard::Key::Enter)
+						{
+							if (!seedInput.empty())
+							{
+								mpClient.setSeed(static_cast<std::uint32_t>(std::stoul(seedInput)));
+								seedInput.clear();
+							}
+						}
+						else if (key == sf::Keyboard::Key::R)
+						{
+							mpClient.randomizeSeed();
+							seedInput.clear();
+						}
+						else if (key == sf::Keyboard::Key::Space)
+							mpClient.startGame();
 					}
 				}
 				else if (state == AppState::Playing)
@@ -159,13 +228,64 @@ int main()
 						usernameInput += static_cast<char>(unicode);
 				}
 			}
+			else if (state == AppState::Room && mpClient.isRoomMaster())
+			{
+				if (auto textEvent = event->getIf<sf::Event::TextEntered>())
+				{
+					char32_t unicode = textEvent->unicode;
+					if (unicode >= '0' && unicode <= '9' && seedInput.size() < 9)
+						seedInput += static_cast<char>(unicode);
+				}
+			}
 		}
 
-		if (state == AppState::Multiplayer)
+		bool inNetworkedLobby = state == AppState::Lobby || state == AppState::InviteSent ||
+			state == AppState::InviteReceived || state == AppState::Room;
+
+		if (inNetworkedLobby)
 		{
 			mpClient.update();
+
 			if (!mpClient.isConnected())
+			{
 				state = AppState::MainMenu;
+			}
+			else
+			{
+				switch (mpClient.getStatus())
+				{
+				case LobbyStatus::Idle:
+					state = AppState::Lobby;
+					seedInput.clear();
+					break;
+				case LobbyStatus::InviteSent:
+					state = AppState::InviteSent;
+					seedInput.clear();
+					break;
+				case LobbyStatus::InviteReceived:
+					state = AppState::InviteReceived;
+					seedInput.clear();
+					break;
+				case LobbyStatus::InRoom:
+					state = AppState::Room;
+					break;
+				}
+
+				if (mpClient.hasNotice())
+				{
+					toastMessage = mpClient.takeNotice();
+					showToast = true;
+					toastClock.restart();
+				}
+
+				std::uint32_t startedSeed = 0;
+				if (mpClient.consumeGameStarted(startedSeed))
+				{
+					g = Game(std::mt19937(startedSeed));
+					clock.restart();
+					state = AppState::Playing;
+				}
+			}
 		}
 
 		if (state == AppState::Playing)
@@ -236,9 +356,9 @@ int main()
 			hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 60.f));
 			window.draw(hint);
 		}
-		else if (state == AppState::Multiplayer)
+		else if (state == AppState::Lobby)
 		{
-			sf::Text title(font, "Connected Players:", 32);
+			sf::Text title(font, "Lobby", 32);
 			title.setFillColor(sf::Color::White);
 			centerOrigin(title);
 			title.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, 60.f));
@@ -247,13 +367,121 @@ int main()
 			const std::vector<std::string>& players = mpClient.getPlayers();
 			for (size_t i = 0; i < players.size(); ++i)
 			{
+				bool isSelf = players[i] == usernameInput;
+				bool isSelected = (int)i == selectedPlayerIndex;
+
+				if (isSelected)
+				{
+					sf::RectangleShape highlight(sf::Vector2f(240.f, 30.f));
+					highlight.setOrigin(sf::Vector2f(120.f, 15.f));
+					highlight.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, 120.f + i * 34.f));
+					highlight.setFillColor(sf::Color(80, 80, 80));
+					highlight.setOutlineThickness(2.f);
+					highlight.setOutlineColor(sf::Color::Yellow);
+					window.draw(highlight);
+				}
+
 				sf::Text playerText(font, players[i], 22);
-				playerText.setFillColor(players[i] == usernameInput ? sf::Color::Yellow : sf::Color::White);
+				playerText.setFillColor(isSelf ? sf::Color::Yellow : sf::Color::White);
 				centerOrigin(playerText);
 				playerText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, 120.f + i * 34.f));
 				window.draw(playerText);
 			}
 
+			sf::Text hint(font, "Up/Down - select | Enter - invite | Escape - leave", 16);
+			hint.setFillColor(sf::Color(200, 200, 200));
+			centerOrigin(hint);
+			hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y - 30.f));
+			window.draw(hint);
+		}
+		else if (state == AppState::InviteSent)
+		{
+			sf::Text title(font, "Waiting for " + mpClient.getInvitePeer() + "...", 26);
+			title.setFillColor(sf::Color::White);
+			centerOrigin(title);
+			title.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f - 30.f));
+			window.draw(title);
+
+			sf::Text countdown(font, std::to_string((int)mpClient.getInviteRemainingSeconds()) + "s remaining", 20);
+			countdown.setFillColor(sf::Color(200, 200, 200));
+			centerOrigin(countdown);
+			countdown.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 10.f));
+			window.draw(countdown);
+
+			sf::Text hint(font, "Escape - cancel invite", 16);
+			hint.setFillColor(sf::Color(200, 200, 200));
+			centerOrigin(hint);
+			hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 60.f));
+			window.draw(hint);
+		}
+		else if (state == AppState::InviteReceived)
+		{
+			sf::Text title(font, mpClient.getInvitePeer() + " invited you to play!", 24);
+			title.setFillColor(sf::Color::White);
+			centerOrigin(title);
+			title.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f - 30.f));
+			window.draw(title);
+
+			sf::Text countdown(font, std::to_string((int)mpClient.getInviteRemainingSeconds()) + "s to respond", 20);
+			countdown.setFillColor(sf::Color(200, 200, 200));
+			centerOrigin(countdown);
+			countdown.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 10.f));
+			window.draw(countdown);
+
+			sf::Text hint(font, "Enter - accept | Escape - decline", 16);
+			hint.setFillColor(sf::Color(200, 200, 200));
+			centerOrigin(hint);
+			hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 60.f));
+			window.draw(hint);
+		}
+		else if (state == AppState::Room)
+		{
+			sf::Text title(font, "Match vs " + mpClient.getOpponentUsername(), 28);
+			title.setFillColor(sf::Color::White);
+			centerOrigin(title);
+			title.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, 80.f));
+			window.draw(title);
+
+			sf::Text seedText(font, "Seed: " + std::to_string(mpClient.getRoomSeed()), 22);
+			seedText.setFillColor(sf::Color::White);
+			centerOrigin(seedText);
+			seedText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, 150.f));
+			window.draw(seedText);
+
+			if (mpClient.isRoomMaster())
+			{
+				sf::Text roleText(font, "You are the room master", 18);
+				roleText.setFillColor(sf::Color::Yellow);
+				centerOrigin(roleText);
+				roleText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, 190.f));
+				window.draw(roleText);
+
+				sf::Text seedInputText(font, "New seed: " + seedInput, 20);
+				seedInputText.setFillColor(sf::Color(200, 200, 200));
+				centerOrigin(seedInputText);
+				seedInputText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, 240.f));
+				window.draw(seedInputText);
+
+				sf::Text hint(font, "Type digits + Enter - set seed | R - random | Space - start | Escape - leave", 14);
+				hint.setFillColor(sf::Color(200, 200, 200));
+				centerOrigin(hint);
+				hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y - 30.f));
+				window.draw(hint);
+			}
+			else
+			{
+				sf::Text waitingText(font, "Waiting for the host to start...", 20);
+				waitingText.setFillColor(sf::Color(200, 200, 200));
+				centerOrigin(waitingText);
+				waitingText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, 220.f));
+				window.draw(waitingText);
+
+				sf::Text hint(font, "Escape - leave", 16);
+				hint.setFillColor(sf::Color(200, 200, 200));
+				centerOrigin(hint);
+				hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y - 30.f));
+				window.draw(hint);
+			}
 		}
 		else if (state == AppState::Playing)
 		{
@@ -288,6 +516,22 @@ int main()
 			centerOrigin(hint);
 			hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 20.f));
 			window.draw(hint);
+		}
+
+		if (showToast)
+		{
+			if (inNetworkedLobby && toastClock.getElapsedTime().asSeconds() < 2.5f)
+			{
+				sf::Text toast(font, toastMessage, 18);
+				toast.setFillColor(sf::Color::Red);
+				centerOrigin(toast);
+				toast.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y - 60.f));
+				window.draw(toast);
+			}
+			else
+			{
+				showToast = false;
+			}
 		}
 
 		window.display();
