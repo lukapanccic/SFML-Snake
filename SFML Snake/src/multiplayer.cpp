@@ -3,6 +3,11 @@
 
 bool MultiplayerClient::connect(const std::string& serverAddress, uint16_t port, const std::string& username)
 {
+	resetSocket();
+	connected = false;
+	players.clear();
+	resetLobbyState();
+
 	lastError.clear();
 
 	auto address = sf::IpAddress::resolve(serverAddress);
@@ -70,7 +75,6 @@ bool MultiplayerClient::connect(const std::string& serverAddress, uint16_t port,
 
 	socket.setBlocking(false);
 	connected = true;
-	resetLobbyState();
 	return true;
 }
 

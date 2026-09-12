@@ -207,7 +207,10 @@ int main()
 							clock.restart();
 						}
 						else if (selected == 1)
+						{
+							mpClient.disconnect();
 							state = AppState::MainMenu;
+						}
 						else if (selected == 2)
 							window.close();
 					}
@@ -215,7 +218,10 @@ int main()
 				else if (state == AppState::GameOver)
 				{
 					if (key == sf::Keyboard::Key::Enter)
+					{
+						mpClient.disconnect();
 						state = AppState::MainMenu;
+					}
 				}
 			}
 
