@@ -73,15 +73,42 @@ int main()
 					{
 						std::string username;
 						packet >> username;
-						client.username = username;
 
-						std::string address = "unknown";
-						if (auto remote = client.socket.getRemoteAddress())
-							address = remote->toString();
+						bool nameTaken = false;
+						for (size_t j = 0; j < clients.size(); ++j)
+						{
+							if (j != i && clients[j]->username == username)
+							{
+								nameTaken = true;
+								break;
+							}
+						}
 
-						std::cout << "[+] \"" << username << "\" connected from " << address << "\n";
+						if (nameTaken)
+						{
+							std::cout << "[!] Rejected \"" << username << "\" (username already taken)\n";
 
-						broadcastPlayerList(clients);
+							sf::Packet rejection;
+							rejection << static_cast<std::uint8_t>(Protocol::MessageType::JoinRejected);
+							rejection << std::string("Username \"" + username + "\" is already taken");
+							(void)client.socket.send(rejection);
+
+							selector.remove(client.socket);
+							clients.erase(clients.begin() + static_cast<std::ptrdiff_t>(i));
+							removed = true;
+						}
+						else
+						{
+							client.username = username;
+
+							std::string address = "unknown";
+							if (auto remote = client.socket.getRemoteAddress())
+								address = remote->toString();
+
+							std::cout << "[+] \"" << username << "\" connected from " << address << "\n";
+
+							broadcastPlayerList(clients);
+						}
 					}
 				}
 				else if (status == sf::Socket::Status::Disconnected || status == sf::Socket::Status::Error)

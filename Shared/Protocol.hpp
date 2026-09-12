@@ -9,7 +9,8 @@ namespace Protocol
 
 	enum class MessageType : std::uint8_t
 	{
-		Join,   
-		PlayerList,
+		Join,         
+		PlayerList,   
+		JoinRejected,
 	};
 }

@@ -9,6 +9,10 @@ class MultiplayerClient
 	sf::TcpSocket socket;
 	bool connected = false;
 	std::vector<std::string> players;
+	std::string lastError;
+
+	void resetSocket();
+	void applyPlayerList(sf::Packet& packet);
 
 public:
 	bool connect(const std::string& serverAddress, uint16_t port, const std::string& username);
@@ -16,4 +20,5 @@ public:
 	void update();
 	bool isConnected() const;
 	const std::vector<std::string>& getPlayers() const;
+	const std::string& getLastError() const;
 };

@@ -190,9 +190,9 @@ int main()
 
 			if (showConnectError)
 			{
-				if (messageClock.getElapsedTime().asSeconds() < 1.5f)
+				if (messageClock.getElapsedTime().asSeconds() < 2.5f)
 				{
-					sf::Text message(font, "Connection failed", 20);
+					sf::Text message(font, mpClient.getLastError(), 20);
 					message.setFillColor(sf::Color::Red);
 					centerOrigin(message);
 					message.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y - 40.f));
