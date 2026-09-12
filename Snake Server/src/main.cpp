@@ -26,6 +26,11 @@ struct Room
 	std::uint32_t masterId;
 	std::uint32_t guestId;
 	std::uint32_t seed;
+
+	bool masterFinished = false;
+	bool guestFinished = false;
+	std::uint32_t masterScore = 0;
+	std::uint32_t guestScore = 0;
 };
 
 static std::vector<std::unique_ptr<Client>> clients;
@@ -49,13 +54,22 @@ static Client* findClientByUsername(const std::string& username)
 	return nullptr;
 }
 
+static bool hasFinished(const Room& room, std::uint32_t id)
+{
+	if (room.masterId == id)
+		return room.masterFinished;
+	if (room.guestId == id)
+		return room.guestFinished;
+	return false;
+}
+
 static bool isBusy(std::uint32_t id)
 {
 	for (auto& inv : invites)
 		if (inv.fromId == id || inv.toId == id)
 			return true;
 	for (auto& room : rooms)
-		if (room.masterId == id || room.guestId == id)
+		if ((room.masterId == id || room.guestId == id) && !hasFinished(room, id))
 			return true;
 	return false;
 }
@@ -129,13 +143,16 @@ static void clearEngagements(std::uint32_t id, const std::string& username)
 
 	if (Room* room = findRoomInvolving(id))
 	{
-		std::uint32_t otherId = (room->masterId == id) ? room->guestId : room->masterId;
+		if (!hasFinished(*room, id))
+		{
+			std::uint32_t otherId = (room->masterId == id) ? room->guestId : room->masterId;
 
-		sf::Packet pkt;
-		pkt << static_cast<std::uint8_t>(Protocol::MessageType::RoomClosed) << (username + " left the room");
-		sendTo(otherId, pkt);
+			sf::Packet pkt;
+			pkt << static_cast<std::uint8_t>(Protocol::MessageType::RoomClosed) << (username + " left the room");
+			sendTo(otherId, pkt);
 
-		removeRoom(room);
+			removeRoom(room);
+		}
 	}
 }
 
@@ -373,8 +390,40 @@ int main()
 								pkt << static_cast<std::uint8_t>(Protocol::MessageType::GameStarted) << room->seed;
 								sendTo(room->masterId, pkt);
 								sendTo(room->guestId, pkt);
+							}
+							break;
+						}
 
-								removeRoom(room);
+						case Protocol::MessageType::PlayerFinished:
+						{
+							std::uint32_t score = 0;
+							packet >> score;
+
+							if (Room* room = findRoomInvolving(client.id))
+							{
+								if (room->masterId == client.id)
+								{
+									room->masterFinished = true;
+									room->masterScore = score;
+								}
+								else
+								{
+									room->guestFinished = true;
+									room->guestScore = score;
+								}
+
+								if (room->masterFinished && room->guestFinished)
+								{
+									sf::Packet toMaster;
+									toMaster << static_cast<std::uint8_t>(Protocol::MessageType::OpponentFinished) << room->guestScore;
+									sendTo(room->masterId, toMaster);
+
+									sf::Packet toGuest;
+									toGuest << static_cast<std::uint8_t>(Protocol::MessageType::OpponentFinished) << room->masterScore;
+									sendTo(room->guestId, toGuest);
+
+									removeRoom(room);
+								}
 							}
 							break;
 						}
@@ -383,14 +432,17 @@ int main()
 						{
 							if (Room* room = findRoomInvolving(client.id))
 							{
-								std::uint32_t otherId = (room->masterId == client.id) ? room->guestId : room->masterId;
+								if (!hasFinished(*room, client.id))
+								{
+									std::uint32_t otherId = (room->masterId == client.id) ? room->guestId : room->masterId;
 
-								sf::Packet pkt;
-								pkt << static_cast<std::uint8_t>(Protocol::MessageType::RoomClosed)
-								    << (client.username + " left the room");
-								sendTo(otherId, pkt);
+									sf::Packet pkt;
+									pkt << static_cast<std::uint8_t>(Protocol::MessageType::RoomClosed)
+									    << (client.username + " left the room");
+									sendTo(otherId, pkt);
 
-								removeRoom(room);
+									removeRoom(room);
+								}
 							}
 							break;
 						}

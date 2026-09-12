@@ -30,6 +30,10 @@ class MultiplayerClient
 	bool gameStartedPending = false;
 	std::uint32_t gameStartedSeed = 0;
 
+	bool opponentResultPending = false;
+	std::uint32_t opponentResultScore = 0;
+	bool opponentLeftPending = false;
+
 	std::string notice;
 
 	void resetSocket();
@@ -60,6 +64,10 @@ public:
 	void startGame();
 	void leaveRoom();
 	bool consumeGameStarted(std::uint32_t& seedOut);
+
+	void reportFinished(std::uint32_t score);
+	bool consumeOpponentResult(std::uint32_t& scoreOut);
+	bool consumeOpponentLeft();
 
 	bool hasNotice() const;
 	std::string takeNotice();

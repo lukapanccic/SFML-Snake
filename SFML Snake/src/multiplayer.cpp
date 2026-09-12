@@ -93,6 +93,9 @@ void MultiplayerClient::resetLobbyState()
 	roomSeed = 0;
 	gameStartedPending = false;
 	gameStartedSeed = 0;
+	opponentResultPending = false;
+	opponentResultScore = 0;
+	opponentLeftPending = false;
 }
 
 void MultiplayerClient::applyPlayerList(sf::Packet& packet)
@@ -237,8 +240,14 @@ void MultiplayerClient::update()
 			notice = reason;
 			status = LobbyStatus::Idle;
 			opponentUsername.clear();
+			opponentLeftPending = true;
 			break;
 		}
+
+		case Protocol::MessageType::OpponentFinished:
+			packet >> opponentResultScore;
+			opponentResultPending = true;
+			break;
 
 		default:
 			break;
@@ -363,6 +372,32 @@ bool MultiplayerClient::consumeGameStarted(std::uint32_t& seedOut)
 
 	seedOut = gameStartedSeed;
 	gameStartedPending = false;
+	return true;
+}
+
+void MultiplayerClient::reportFinished(std::uint32_t score)
+{
+	sf::Packet packet;
+	packet << static_cast<std::uint8_t>(Protocol::MessageType::PlayerFinished) << score;
+	(void)socket.send(packet);
+}
+
+bool MultiplayerClient::consumeOpponentResult(std::uint32_t& scoreOut)
+{
+	if (!opponentResultPending)
+		return false;
+
+	scoreOut = opponentResultScore;
+	opponentResultPending = false;
+	return true;
+}
+
+bool MultiplayerClient::consumeOpponentLeft()
+{
+	if (!opponentLeftPending)
+		return false;
+
+	opponentLeftPending = false;
 	return true;
 }
 

@@ -49,6 +49,12 @@ int main()
 	sf::Clock toastClock;
 	bool showToast = false;
 
+	bool multiplayerMatch = false;
+	bool finishedReported = false;
+	bool opponentDone = false;
+	std::uint32_t opponentFinalScore = 0;
+	bool opponentLeftEarly = false;
+
 	// seed
 	std::mt19937 random(std::random_device{}());
 	Game g(random);
@@ -78,6 +84,7 @@ int main()
 						{
 							g = Game(std::mt19937(std::random_device{}()));
 							clock.restart();
+							multiplayerMatch = false;
 							state = AppState::Playing;
 						}
 						else if (selected == 1)
@@ -183,7 +190,10 @@ int main()
 				else if (state == AppState::Playing)
 				{
 					if (key == sf::Keyboard::Key::Escape)
-						state = AppState::Paused;
+					{
+						if (!multiplayerMatch)
+							state = AppState::Paused;
+					}
 					else
 						g.handleInput(key);
 				}
@@ -219,8 +229,19 @@ int main()
 				{
 					if (key == sf::Keyboard::Key::Enter)
 					{
-						mpClient.disconnect();
-						state = AppState::MainMenu;
+						if (multiplayerMatch && mpClient.isConnected())
+						{
+							mpClient.leaveRoom();
+							multiplayerMatch = false;
+							selectedPlayerIndex = 0;
+							state = AppState::Lobby;
+						}
+						else
+						{
+							mpClient.disconnect();
+							multiplayerMatch = false;
+							state = AppState::MainMenu;
+						}
 					}
 				}
 			}
@@ -289,9 +310,29 @@ int main()
 				{
 					g = Game(std::mt19937(startedSeed));
 					clock.restart();
+					multiplayerMatch = true;
+					finishedReported = false;
+					opponentDone = false;
+					opponentFinalScore = 0;
+					opponentLeftEarly = false;
 					state = AppState::Playing;
 				}
 			}
+		}
+
+		if (multiplayerMatch && (state == AppState::Playing || state == AppState::GameOver))
+		{
+			mpClient.update();
+
+			std::uint32_t oppScore = 0;
+			if (mpClient.consumeOpponentResult(oppScore))
+			{
+				opponentDone = true;
+				opponentFinalScore = oppScore;
+			}
+
+			if (mpClient.consumeOpponentLeft())
+				opponentLeftEarly = true;
 		}
 
 		if (state == AppState::Playing)
@@ -299,6 +340,12 @@ int main()
 			if (g.isGameOver())
 			{
 				state = AppState::GameOver;
+
+				if (multiplayerMatch && !finishedReported)
+				{
+					mpClient.reportFinished(static_cast<std::uint32_t>(g.getScore()));
+					finishedReported = true;
+				}
 			}
 			else if (clock.getElapsedTime().asSeconds() >= 0.2f)
 			{
@@ -313,22 +360,6 @@ int main()
 		if (state == AppState::MainMenu)
 		{
 			mainMenu.draw(window, font, "Snake");
-
-			if (showConnectError)
-			{
-				if (messageClock.getElapsedTime().asSeconds() < 2.5f)
-				{
-					sf::Text message(font, mpClient.getLastError(), 20);
-					message.setFillColor(sf::Color::Red);
-					centerOrigin(message);
-					message.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y - 40.f));
-					window.draw(message);
-				}
-				else
-				{
-					showConnectError = false;
-				}
-			}
 		}
 		else if (state == AppState::UsernameEntry)
 		{
@@ -361,6 +392,22 @@ int main()
 			centerOrigin(hint);
 			hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 60.f));
 			window.draw(hint);
+
+			if (showConnectError)
+			{
+				if (messageClock.getElapsedTime().asSeconds() < 2.5f)
+				{
+					sf::Text message(font, mpClient.getLastError(), 18);
+					message.setFillColor(sf::Color::Red);
+					centerOrigin(message);
+					message.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 100.f));
+					window.draw(message);
+				}
+				else
+				{
+					showConnectError = false;
+				}
+			}
 		}
 		else if (state == AppState::Lobby)
 		{
@@ -511,16 +558,61 @@ int main()
 			overlay.setFillColor(sf::Color(0, 0, 0, 150));
 			window.draw(overlay);
 
-			sf::Text overText(font, "Game Over - Score: " + std::to_string(g.getScore()), 28);
-			overText.setFillColor(sf::Color::White);
-			centerOrigin(overText);
-			overText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f - 20.f));
-			window.draw(overText);
+			if (multiplayerMatch)
+			{
+				sf::Text overText(font, "You finished - Score: " + std::to_string(g.getScore()), 26);
+				overText.setFillColor(sf::Color::White);
+				centerOrigin(overText);
+				overText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f - 40.f));
+				window.draw(overText);
 
-			sf::Text hint(font, "Enter - Main Menu", 18);
+				if (opponentDone)
+				{
+					std::string verdict = g.getScore() > (int)opponentFinalScore ? "You win!"
+						: g.getScore() < (int)opponentFinalScore ? "You lose!" : "It's a tie!";
+
+					sf::Text oppText(font, mpClient.getOpponentUsername() + "'s score: " + std::to_string(opponentFinalScore), 22);
+					oppText.setFillColor(sf::Color::White);
+					centerOrigin(oppText);
+					oppText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f - 5.f));
+					window.draw(oppText);
+
+					sf::Text verdictText(font, verdict, 24);
+					verdictText.setFillColor(sf::Color::Yellow);
+					centerOrigin(verdictText);
+					verdictText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 30.f));
+					window.draw(verdictText);
+				}
+				else if (opponentLeftEarly)
+				{
+					sf::Text leftText(font, "Opponent left the match", 20);
+					leftText.setFillColor(sf::Color(200, 200, 200));
+					centerOrigin(leftText);
+					leftText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 10.f));
+					window.draw(leftText);
+				}
+				else
+				{
+					sf::Text waitingText(font, "Waiting for " + mpClient.getOpponentUsername() + " to finish...", 20);
+					waitingText.setFillColor(sf::Color(200, 200, 200));
+					centerOrigin(waitingText);
+					waitingText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 10.f));
+					window.draw(waitingText);
+				}
+			}
+			else
+			{
+				sf::Text overText(font, "Game Over - Score: " + std::to_string(g.getScore()), 28);
+				overText.setFillColor(sf::Color::White);
+				centerOrigin(overText);
+				overText.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f - 20.f));
+				window.draw(overText);
+			}
+
+			sf::Text hint(font, multiplayerMatch ? "Enter - Back to Lobby" : "Enter - Main Menu", 18);
 			hint.setFillColor(sf::Color(200, 200, 200));
 			centerOrigin(hint);
-			hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 20.f));
+			hint.setPosition(sf::Vector2f((float)window.getSize().x / 2.f, (float)window.getSize().y / 2.f + 60.f));
 			window.draw(hint);
 		}
 

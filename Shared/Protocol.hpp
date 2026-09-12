@@ -26,13 +26,16 @@ namespace Protocol
 		DeclineInvite,  
 		CancelInvite,  
 
-		RoomJoined,    
-		SetSeed,       
+		RoomJoined,
+		SetSeed,
 		RandomizeSeed,
-		SeedUpdated, 
-		StartGame, 
+		SeedUpdated,
+		StartGame,
 		GameStarted,
 		LeaveRoom,
 		RoomClosed,
+
+		PlayerFinished,  
+		OpponentFinished,
 	};
 }
