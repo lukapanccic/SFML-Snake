@@ -13,6 +13,20 @@ void Game::setGameOver(bool state)
 
 void Game::draw(sf::RenderWindow& window, const sf::Font& font)
 {
+	const int tileSize = 20;
+	const int boardSize = 600;
+	sf::Color gridColor(40, 40, 40);
+
+	sf::VertexArray grid(sf::PrimitiveType::Lines);
+	for (int i = 0; i <= boardSize; i += tileSize)
+	{
+		grid.append(sf::Vertex{ sf::Vector2f((float)i, 0.f), gridColor });
+		grid.append(sf::Vertex{ sf::Vector2f((float)i, (float)boardSize), gridColor });
+		grid.append(sf::Vertex{ sf::Vector2f(0.f, (float)i), gridColor });
+		grid.append(sf::Vertex{ sf::Vector2f((float)boardSize, (float)i), gridColor });
+	}
+	window.draw(grid);
+
 	food.draw(window);
 	snake.draw(window);
 

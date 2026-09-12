@@ -22,7 +22,7 @@ enum class AppState
 
 int main()
 {
-	sf::RenderWindow window(sf::VideoMode({ 600, 600 }), "Snake");
+	sf::RenderWindow window(sf::VideoMode({ 600, 600 }), "Snake", sf::Style::Titlebar | sf::Style::Close);
 	window.setFramerateLimit(30);
 
 	sf::Font font;
